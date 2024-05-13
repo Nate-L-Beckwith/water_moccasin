@@ -1,0 +1,5 @@
+2024-05-12 20:34:56,858 - INFO - Removed \\DESKTOP-NATES\iso\Dolphin\Games\Pull_archive_zips\007 - From Russia with Love (USA).iso due to size mismatch (expected: 1.4 GB).
+2024-05-12 20:34:56,858 - INFO - Removed \\DESKTOP-NATES\iso\Dolphin\Games\Pull_archive_zips\007 - Agent Under Fire (v1.01)(USA).iso due to size mismatch (expected: 1.4 GB).
+2024-05-12 20:34:56,891 - INFO - Removed \\DESKTOP-NATES\iso\Dolphin\Games\Pull_archive_zips\007 - Everything or Nothing (USA).iso due to size mismatch (expected: 1.4 GB).
+2024-05-12 20:35:18,489 - INFO - Removed \\DESKTOP-NATES\iso\Dolphin\Games\Pull_archive_zips\1080 Avalanche (USA).iso due to size mismatch (expected: 1.4 GB).
+2024-05-12 20:35:18,507 - INFO - Removed \\DESKTOP-NATES\iso\Dolphin\Games\Pull_archive_zips\18 Wheeler - American Pro Trucker (USA).iso due to size mismatch (expected: 1.4 GB).
