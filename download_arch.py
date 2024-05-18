@@ -7,7 +7,6 @@ import logging
 from datetime import datetime
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
-import speedtest
 
 # Configure logging
 logging.basicConfig(filename='download_log.txt', level=logging.INFO,
