@@ -1,6 +1,4 @@
-# download_arch.py
 import os
-import shutil
 import requests
 import xml.etree.ElementTree as ET
 import logging
@@ -9,22 +7,10 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configure logging
-logging.basicConfig(filename='download_log.txt', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='download_log.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# def check_internet_speed():
-#     """Check internet speed using speedtest-cli and return the download speed in Mbps."""
-#     st = speedtest.Speedtest()
-#     st.get_best_server()
-#     download_speed = st.download() / 1_000_000  # Convert from bits/s to Mbps
-#     return download_speed
-
-def determine_concurrency(download_speed):
-    """Determine the number of concurrent downloads based on the internet speed."""
-    if download_speed > 50:
-        return 4  # High speed, more concurrency
-    else:
-        return 2  # Lower speed, less concurrency
+# Set the number of concurrent downloads
+MAX_CONCURRENT_DOWNLOADS = 4
 
 # Main functionalities
 def create_folder_for_iso(download_dir, iso_name):
@@ -57,16 +43,13 @@ def download_file(name, size, download_dir, progress_dict):
         return "Failed"
 
 def download_files_from_xml(xml_url, download_dir):
-    speed = check_internet_speed()
-    max_concurrent = determine_concurrency(speed)
-    
     response = requests.get(xml_url)
     response.raise_for_status()
     root = ET.fromstring(response.content)
     files = [(file.get('name'), int(file.get('size', -1)), download_dir) for file in root.findall('.//file') if file.get('name')]
     progress_dict = {name: idx for idx, (name, _, _) in enumerate(files)}
     
-    with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOWNLOADS) as executor:
         futures = {executor.submit(download_file, *f, progress_dict): f for f in files}
         for future in tqdm(as_completed(futures), total=len(files), desc="Overall Progress", unit="file"):
             future.result()
