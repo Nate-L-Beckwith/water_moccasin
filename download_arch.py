@@ -43,10 +43,27 @@ def download_file(name, size, download_dir, progress_dict):
         return "Failed"
 
 def download_files_from_xml(xml_url, download_dir):
+    logging.info(f"Fetching XML from {xml_url}")
     response = requests.get(xml_url)
     response.raise_for_status()
+    logging.info("XML fetched successfully")
+    
     root = ET.fromstring(response.content)
+    
+    # Adjusting to log the structure of XML for debugging
+    logging.info(f"Inspecting XML structure")
+    for child in root.iter():
+        logging.info(f"Tag: {child.tag}, Attributes: {child.attrib}, Text: {child.text}")
+    
+    # Adjust this line based on the actual XML structure
     files = [(file.get('name'), int(file.get('size', -1)), download_dir) for file in root.findall('.//file') if file.get('name')]
+    
+    logging.info(f"Found {len(files)} files to download")
+    
+    if not files:
+        logging.warning("No files found to download")
+        return
+
     progress_dict = {name: idx for idx, (name, _, _) in enumerate(files)}
     
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOWNLOADS) as executor:
