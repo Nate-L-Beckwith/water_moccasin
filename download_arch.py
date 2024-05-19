@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 import logging
 from datetime import datetime
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configure logging
 logging.basicConfig(filename='download_log.txt', level=logging.INFO,
@@ -61,6 +61,7 @@ def download_files_from_xml(xml_url, download_dir):
     max_concurrent = determine_concurrency(speed)
     
     response = requests.get(xml_url)
+    response.raise_for_status()
     root = ET.fromstring(response.content)
     files = [(file.get('name'), int(file.get('size', -1)), download_dir) for file in root.findall('.//file') if file.get('name')]
     progress_dict = {name: idx for idx, (name, _, _) in enumerate(files)}
