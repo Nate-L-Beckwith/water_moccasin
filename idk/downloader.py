@@ -19,19 +19,21 @@ def write_info_file(folder_path, info_content):
     with open(info_file_path, 'w') as file:
         file.write(info_content)
 
-def download_file(name, size, download_dir, progress_dict):
+def download_file(name, download_dir, progress_dict):
     folder_path = create_folder_for_iso(download_dir, name)
     filename = os.path.join(folder_path, name)
     download_url = f"https://archive.org/download/efgamecubeusa/{name}"
     try:
         with requests.get(download_url, stream=True) as r:
             r.raise_for_status()
+            size = int(r.headers.get('content-length', 0))
             with open(filename, 'wb') as f, tqdm(total=size, unit='B', unit_scale=True, desc=name, position=progress_dict[name]) as progress:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         progress.update(len(chunk))
         write_info_file(folder_path, f"Downloaded {name} on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logging.info(f"Successfully downloaded {name}")
         return "Completed"
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to download {filename}. Error: {e}")
@@ -39,6 +41,8 @@ def download_file(name, size, download_dir, progress_dict):
 
 def download_files(urls, download_dir, concurrency):
     progress_dict = {url.split('/')[-1]: i for i, url in enumerate(urls)}
+    logging.info(f"Starting download of {len(urls)} files with concurrency {concurrency}")
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
-        results = list(tqdm(executor.map(lambda url: download_file(url.split('/')[-1], 0, download_dir, progress_dict), urls), total=len(urls)))
+        results = list(tqdm(executor.map(lambda url: download_file(url.split('/')[-1], download_dir, progress_dict), urls), total=len(urls)))
+    logging.info("Download process completed.")
     return results

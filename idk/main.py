@@ -2,6 +2,9 @@
 from config import DEFAULT_CONCURRENCY, DEFAULT_DOWNLOAD_DIRECTORY
 from downloader import download_files
 from file_manager import FileManager
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 def main():
     xml_url = 'https://dn720005.ca.archive.org/0/items/efgamecubeusa/efgamecubeusa_files.xml'
