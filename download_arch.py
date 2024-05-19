@@ -12,12 +12,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 logging.basicConfig(filename='download_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-def check_internet_speed():
-    """Check internet speed using speedtest-cli and return the download speed in Mbps."""
-    st = speedtest.Speedtest()
-    st.get_best_server()
-    download_speed = st.download() / 1_000_000  # Convert from bits/s to Mbps
-    return download_speed
+# def check_internet_speed():
+#     """Check internet speed using speedtest-cli and return the download speed in Mbps."""
+#     st = speedtest.Speedtest()
+#     st.get_best_server()
+#     download_speed = st.download() / 1_000_000  # Convert from bits/s to Mbps
+#     return download_speed
 
 def determine_concurrency(download_speed):
     """Determine the number of concurrent downloads based on the internet speed."""
