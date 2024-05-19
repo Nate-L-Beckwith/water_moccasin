@@ -19,27 +19,31 @@ def create_folder_for_iso(download_dir, iso_name):
     os.makedirs(folder_path, exist_ok=True)
     return folder_path
 
-def write_info_file(folder_path, info_content):
+def write_info_file(folder_path, name, size):
     info_file_path = os.path.join(folder_path, 'info.txt')
+    info_content = f"File: {name}\nSize: {size} bytes\nDate: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     with open(info_file_path, 'w', encoding='utf-8') as file:
         file.write(info_content)
 
 def download_file(name, size, download_dir, progress_dict):
     folder_path = create_folder_for_iso(download_dir, name)
+    write_info_file(folder_path, name, size)
     filename = os.path.join(folder_path, name)
     download_url = f"https://archive.org/download/efgamecubeusa/{name}"
     try:
-        with requests.get(download_url, stream=True, timeout=10) as r:  # Add timeout argument
+        with requests.get(download_url, stream=True, timeout=10) as r:
             r.raise_for_status()
             with open(filename, 'wb') as f, tqdm(total=size, unit='B', unit_scale=True, desc=name, position=progress_dict[name]) as progress:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         progress.update(len(chunk))
-        write_info_file(folder_path, "Downloaded %s on %s" % (name, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        final_folder_name = name.split(' (')[0].replace('/', '_').replace('\\', '_')
+        final_folder_path = os.path.join(download_dir, final_folder_name)
+        os.rename(folder_path, final_folder_path)
         return "Completed"
     except requests.exceptions.RequestException as e:
-        logging.error("Failed to download %s. Error: %s", filename, e)  # Use lazy % formatting
+        logging.error("Failed to download %s. Error: %s", filename, e)
         return "Failed"
 
 def download_files_from_xml(xml_url, download_dir):
@@ -50,18 +54,18 @@ def download_files_from_xml(xml_url, download_dir):
 
     root = ET.fromstring(response.content)
 
-    # Adjusting to log the structure of XML for debugging
     logging.info("Inspecting XML structure")
     for child in root.iter():
         logging.info("Tag: %s, Attributes: %s, Text: %s", child.tag, child.attrib, child.text)
 
-    # Adjust this line based on the actual XML structure
     files = [(file.get('name'), int(file.get('size', -1)), download_dir) for file in root.findall('.//file') if file.get('name')]
 
     logging.info("Found %s files to download", len(files))
+    print(f"Found {len(files)} files to download")
 
     if not files:
         logging.warning("No files found to download")
+        print("No files found to download")
         return
 
     progress_dict = {name: idx for idx, (name, _, _) in enumerate(files)}
@@ -69,9 +73,14 @@ def download_files_from_xml(xml_url, download_dir):
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOWNLOADS) as executor:
         futures = {executor.submit(download_file, *f, progress_dict): f for f in files}
         for future in tqdm(as_completed(futures), total=len(files), desc="Overall Progress", unit="file"):
-            future.result()
+            result = future.result()
+            if result == "Completed":
+                print(f"Download completed for: {futures[future][0]}")
+            else:
+                print(f"Download failed for: {futures[future][0]}")
 
     logging.info("All files have been processed.")
+    print("All files have been processed.")
 
 # Example usage
 if __name__ == "__main__":
