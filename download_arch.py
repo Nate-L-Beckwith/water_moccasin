@@ -9,18 +9,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COM
 # Configure logging
 logging.basicConfig(filename='download_log.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Set the number of concurrent downloads
+# Constants
 MAX_CONCURRENT_DOWNLOADS = 4
+RETRY_COUNT = 3
+TIMEOUT = 10
 
 def sanitize_filename(name):
-    return name.replace('/', '_').replace('\\', '_').replace(':', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
+    return name.translate(str.maketrans({'/': '_', '\\': '_', ':': '_', '*': '_', '?': '_', '"': '_', '<': '_', '>': '_', '|': '_'}))
 
 def create_folder_for_iso(download_dir, iso_name):
     folder_name = sanitize_filename(iso_name.split(' (')[0])
     folder_path = os.path.join(download_dir, folder_name)
     os.makedirs(folder_path, exist_ok=True)
     logging.info(f"Created folder: {folder_path}")
-    print(f"Created folder: {folder_path}")
     return folder_path
 
 def write_info_file(folder_path, name, size):
@@ -36,35 +37,43 @@ def download_file(name, size, download_dir, progress_dict):
     sanitized_name = sanitize_filename(name)
     filename = os.path.join(folder_path, sanitized_name)
     download_url = f"https://archive.org/download/efgamecubeusa/{name}"
-    try:
-        with requests.get(download_url, stream=True, timeout=10) as r:
-            r.raise_for_status()
-            with open(filename, 'wb') as f, tqdm(total=size, unit='B', unit_scale=True, desc=name, position=progress_dict[name]) as progress:
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        progress.update(len(chunk))
-        final_folder_name = sanitized_name.split(' (')[0]
-        final_folder_path = os.path.join(download_dir, final_folder_name)
-        os.rename(folder_path, final_folder_path)
-        logging.info(f"Renamed folder to: {final_folder_path}")
-        print(f"Download completed and folder renamed to: {final_folder_path}")
-        return "Completed"
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to download {filename}. Error: {e}")
-        print(f"Failed to download {filename}. Error: {e}")
-        return "Failed"
-    except FileNotFoundError as e:
-        logging.error(f"File not found: {filename}. Error: {e}")
-        print(f"File not found: {filename}. Error: {e}")
-        return "Failed"
+    
+    for attempt in range(1, RETRY_COUNT + 1):
+        try:
+            with requests.get(download_url, stream=True, timeout=TIMEOUT) as r:
+                r.raise_for_status()
+                with open(filename, 'wb') as f, tqdm(total=size, unit='B', unit_scale=True, desc=name, position=progress_dict[name]) as progress:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            progress.update(len(chunk))
+            final_folder_name = sanitized_name.split(' (')[0]
+            final_folder_path = os.path.join(download_dir, final_folder_name)
+            try:
+                os.rename(folder_path, final_folder_path)
+                logging.info(f"Renamed folder to: {final_folder_path}")
+                print(f"Download completed and folder renamed to: {final_folder_path}")
+            except OSError as e:
+                logging.error(f"Failed to rename folder {folder_path} to {final_folder_path}. Error: {e}")
+                print(f"Failed to rename folder {folder_path} to {final_folder_path}. Error: {e}")
+            return "Completed"
+        except (requests.exceptions.RequestException, FileNotFoundError) as e:
+            logging.error(f"Failed to download {filename} on attempt {attempt}/{RETRY_COUNT}. Error: {e}")
+            if attempt == RETRY_COUNT:
+                print(f"Failed to download {filename} after {RETRY_COUNT} attempts. Error: {e}")
+                return "Failed"
 
 def download_files_from_xml(xml_url, download_dir):
     logging.info(f"Fetching XML from {xml_url}")
     print(f"Fetching XML from {xml_url}")
-    response = requests.get(xml_url, timeout=10)
-    response.raise_for_status()
-    logging.info("XML fetched successfully")
+    try:
+        response = requests.get(xml_url, timeout=TIMEOUT)
+        response.raise_for_status()
+        logging.info("XML fetched successfully")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Failed to fetch XML from {xml_url}. Error: {e}")
+        print(f"Failed to fetch XML from {xml_url}. Error: {e}")
+        return
 
     root = ET.fromstring(response.content)
 
@@ -96,7 +105,7 @@ def download_files_from_xml(xml_url, download_dir):
                     else:
                         print(f"Download failed for: {futures[future]}")
                     del futures[future]
-            
+
             future = executor.submit(download_file, name, size, download_dir, progress_dict)
             futures[future] = name
 
