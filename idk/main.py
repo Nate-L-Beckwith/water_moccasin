@@ -1,5 +1,5 @@
 # main.py
-from config import DOWNLOAD_CONCURRENCY
+from config import DEFAULT_CONCURRENCY
 from downloader import Downloader
 from file_manager import FileManager
 
@@ -8,7 +8,7 @@ def main():
     urls = file_manager.get_urls()  # Method to fetch URLs from XML
     dest_folder = 'downloads'
 
-    downloader = Downloader(DOWNLOAD_CONCURRENCY)
+    downloader = Downloader(DEFAULT_CONCURRENCY)
     downloader.download_files(urls, dest_folder)
 
 if __name__ == "__main__":
