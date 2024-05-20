@@ -10,9 +10,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COM
 logging.basicConfig(filename='download_log.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Constants
-MAX_CONCURRENT_DOWNLOADS = 4
-RETRY_COUNT = 3
-TIMEOUT = 10
+MAX_CONCURRENT_DOWNLOADS = 8
+RETRY_COUNT = 6
+TIMEOUT = 100
 
 def sanitize_filename(name):
     return name.translate(str.maketrans({'/': '_', '\\': '_', ':': '_', '*': '_', '?': '_', '"': '_', '<': '_', '>': '_', '|': '_'}))
