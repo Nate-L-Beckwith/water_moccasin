@@ -13,7 +13,6 @@ This project, named `water_moccasin`, aims to containerize, wrap, and deploy a D
 
 ## Directory Structure
 
-\`\`\`
 water_moccasin/
 │
 ├── Dockerfile
@@ -34,7 +33,7 @@ water_moccasin/
 │   └── game.iso
 └── saves/
     └── README.md
-\`\`\`
+
 
 ## How to Use
 
