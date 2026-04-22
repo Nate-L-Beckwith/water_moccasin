@@ -1,0 +1,2 @@
+# Dolphin controller profile .ini files go here. Copied into the container
+# at /home/player/.config/dolphin-emu/Config on start.

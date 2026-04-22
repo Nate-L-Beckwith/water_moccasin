@@ -1,0 +1,2 @@
+# Persistent save data lives here (GC memory cards, Wii NAND, StateSaves, Cache).
+# Kept across container rebuilds and cleanup runs.

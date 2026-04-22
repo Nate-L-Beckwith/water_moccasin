@@ -1,0 +1,41 @@
+# Base compose for water_moccasin. Targets a Linux host with X11 + PulseAudio
+# (or WSLg on Windows). Controller devices aren't listed here because they
+# vary by machine — scripts/start.sh augments this file with --device flags
+# per CONTROLLER_DEVICES in .env, or write a docker-compose.override.yml.
+services:
+  dolphin:
+    build:
+      context: .
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+        INPUT_GID: "${INPUT_GID:-104}"
+    image: "${IMAGE_NAME:-water-moccasin/dolphin}:${IMAGE_TAG:-latest}"
+    container_name: "${CONTAINER_NAME:-water-moccasin}"
+    network_mode: host
+    mem_limit: "${MEM_LIMIT:-2g}"
+    environment:
+      DISPLAY: "${DISPLAY:-:0}"
+      PULSE_SERVER: "unix:/run/user/${UID:-1000}/pulse/native"
+      XDG_RUNTIME_DIR: "/run/user/${UID:-1000}"
+      DOLPHIN_MODE: "${DOLPHIN_MODE:-play}"
+      NETPLAY_PORT: "${NETPLAY_PORT:-2626}"
+      NETPLAY_GAME: "${NETPLAY_GAME:-}"
+    volumes:
+      - ./game:/game:ro
+      - ./saves:/saves
+      - ./logs:/logs
+      - ./controller_configs:/controller_configs:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev/shm:/dev/shm
+      - /etc/machine-id:/etc/machine-id:ro
+      - "/run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse"
+    devices:
+      - /dev/dri:/dev/dri
+    cap_add:
+      - SYS_NICE
+    group_add:
+      - "${INPUT_GID:-104}"
+    restart: "no"
+    stdin_open: true
+    tty: true

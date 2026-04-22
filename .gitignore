@@ -1,0 +1,24 @@
+.env
+docker-compose.override.yml
+
+# User content — never commit
+game/*
+!game/.gitkeep
+saves/*
+!saves/.gitkeep
+logs/*
+!logs/.gitkeep
+controller_configs/*
+!controller_configs/.gitkeep
+
+# USB build artifacts
+dist/
+*.tar
+*.tar.gz
+
+# Editor / OS
+.vscode/*
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+.claude

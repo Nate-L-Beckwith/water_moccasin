@@ -1,0 +1,1 @@
+# Drop your ISO/GCM/RVZ/WBFS here. The container mounts this folder read-only at /game.
