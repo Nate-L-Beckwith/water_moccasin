@@ -1,119 +1,102 @@
 # water_moccasin
 
-Containerize and deploy the [Dolphin](https://dolphin-emu.org/) GameCube/Wii
-emulator with a game of your choice. Everything host-side is driven by a
-single Python CLI ([wm.py](wm.py)) — no bash scripts, no external deps.
+Dolphin (GameCube/Wii) in a Docker container, driven by a single Python
+script. Bring your own ROM. Everything else is wrapped up so you can blow
+the container away without losing your saves.
 
-## What it does
+## What you actually get
 
-- **Containerize** — Arch Linux-based image with `dolphin-emu`, Mesa/Vulkan
-  runtime, PulseAudio client, and a Python entrypoint.
-- **Wrap** — `wm.py` drives `docker build` / `docker run` with the right
-  mounts, devices, and user mapping.
-- **Deploy** — one command to build + preflight the host + launch.
-- **Cleanup** — stops the container, rotates logs, preserves saves by default
-  (optionally archives or wipes them).
-- **USB deployment** — bundles the exported image plus launchers onto a USB
-  stick or into a `.tar.gz`.
-- **Netplay** — host/join/status subcommands; actual hosting is a Dolphin UI
-  action (Tools → NetPlay → Host).
-- **Controller management** — list detected input devices, pick which to
-  forward into the container, stream live telemetry via `evtest`.
+An Arch-based image with `dolphin-emu`, Mesa/Vulkan, and the PulseAudio
+client bits. A stdlib-only Python CLI (`wm.py`) that handles building,
+running, cleanup, controller forwarding, save backups, and bundling the
+whole thing onto a USB stick. Saves live on the host via symlinks, so the
+container is disposable. Netplay works too, with the caveat below.
 
 ## Layout
 
 ```text
 water_moccasin/
-├── wm.py                    ← host-side CLI (stdlib only)
-├── Dockerfile
-├── docker-compose.yml       ← optional alternative launcher
-├── .env.example             ← copy to .env and edit
+├── wm.py                   host CLI (Python 3.10+, stdlib only)
+├── Dockerfile              Arch base
+├── docker-compose.yml      alternative launcher if you prefer compose
+├── .env.example            copy to .env and edit
 ├── container/
-│   └── entrypoint.py        ← runs inside the container
-├── game/                    ← drop your ISO/GCM/RVZ/WBFS here
-├── saves/                   ← persistent GC/Wii saves + cache (live)
-├── dist/saves/              ← backup archives (tar.gz, created on demand)
-├── logs/                    ← wm.log + container.log (rotated)
-└── controller_configs/      ← Dolphin controller .ini profiles
+│   └── entrypoint.py       runs inside the container
+├── game/                   drop your ISO / GCM / RVZ / WBFS here
+├── saves/                  live save data (persistent, host-owned)
+├── dist/saves/             backup archives (tar.gz)
+├── logs/                   wm.log + container.log (rotated)
+└── controller_configs/     Dolphin .ini profiles
 ```
 
 ## Requirements
 
-- **Docker** (Engine or Desktop). The CLI shells out to `docker` on `PATH`.
-- **Python 3.10+** on the host. Stdlib only — nothing to install.
-- **Linux host** (or **WSL2** on Windows). The container expects an X11
-  socket at `/tmp/.X11-unix`, a PulseAudio socket under `/run/user/<uid>/`,
-  and `/dev/dri` for GPU. Running on native Windows without WSL2 will not
-  surface the Dolphin UI.
+Docker (Engine or Desktop) and Python 3.10+. That's it; the CLI doesn't
+import anything that isn't in the stdlib.
+
+The container itself assumes a Linux host for the GUI side of things: X11
+socket at `/tmp/.X11-unix`, PulseAudio at `/run/user/<uid>/pulse`, and
+`/dev/dri` for GPU. On Windows that means WSL2 (works fine with WSLg).
+Running on native Windows without WSL won't surface the Dolphin window.
 
 ## Quick start
 
 ```sh
-cp .env.example .env            # edit UID/GID and INPUT_GID to match your host
-python wm.py build              # build the image
-cp your-game.iso game/          # drop in one legally-obtained game
-python wm.py deploy             # preflight + launch
+cp .env.example .env             # edit UID / GID / INPUT_GID to match your host
+python wm.py build               # first build is slow — pacman does its thing
+cp your-game.iso game/
+python wm.py deploy              # preflight + run
 ```
 
-`deploy` does a host preflight (DISPLAY, X11 socket, PulseAudio socket,
-`/dev/dri`) and warns on each missing piece before running the container.
+`deploy` warns about missing DISPLAY, missing PulseAudio socket, missing
+`/dev/dri`, etc. It won't refuse to run — sometimes you genuinely don't
+care about audio.
 
-## Commands
+## Subcommands
 
-Every subcommand supports `--help`:
+All of these take `--help`.
 
 | Command | What it does |
 | --- | --- |
-| `python wm.py build [--no-cache] [--tag name:tag]` | Build the image with `UID`/`GID`/`INPUT_GID` baked in. |
-| `python wm.py start [-- dolphin-args...]` | Run the container. Image must already exist. |
-| `python wm.py deploy [--rebuild] [-- dolphin-args...]` | Build-if-needed, preflight, then start. |
-| `python wm.py cleanup [--archive] [--wipe-saves] [--rmi]` | Stop container, rotate logs, optionally archive/wipe saves or remove image. |
-| `python wm.py package-usb --dest /path/to/usb` | Export image + launchers to a USB mount. `--tarball file.tar.gz` writes a portable archive instead. `--include-saves` bundles save data. |
-| `python wm.py netplay host [--game /game/foo.iso] [--port 2626]` | Launch UI in netplay-host mode (the actual hosting is done from Dolphin's UI). |
-| `python wm.py netplay join --peer HOST:PORT` | Launch UI so you can connect to a peer. |
-| `python wm.py netplay status` | Show container + listening-port status. |
-| `python wm.py controllers list` | Print detected `/dev/input` devices. |
-| `python wm.py controllers pick [--device ...]` | Persist a device (or pair) into `CONTROLLER_DEVICES=` in `.env`. |
-| `python wm.py controllers telemetry [/dev/input/eventN]` | Live button/axis events via `evtest` (host or containerized fallback). |
-| `python wm.py controllers profiles` | List `.ini` profiles in `controller_configs/`. |
-| `python wm.py saves list` | Show subdirectories of `./saves` with sizes. |
-| `python wm.py saves backup [--name NAME] [--force]` | Archive `./saves` to `dist/saves/<name>.tar.gz` (default name: timestamp). |
-| `python wm.py saves list-backups` | Show existing backups (name, size, mtime). |
-| `python wm.py saves restore NAME [--force]` | Restore a backup into `./saves`. Refuses to merge into a non-empty dir without `--force`. |
-| `python wm.py saves remove NAME` | Delete a named backup. |
-| `python wm.py saves prune --keep N` | Keep the newest `N` backups, remove older ones. |
+| `wm.py build [--no-cache] [--tag name:tag]` | Build the image with your UID/GID baked in. |
+| `wm.py start [-- dolphin-args...]` | Run the container. Image has to exist already. |
+| `wm.py deploy [--rebuild]` | Build if needed, preflight, start. The "just run it" button. |
+| `wm.py cleanup [--archive] [--wipe-saves] [--rmi]` | Stop + remove the container, rotate logs, optionally archive or nuke saves, optionally drop the image. |
+| `wm.py package-usb --dest /path` | Export image + launchers to a USB mount. Use `--tarball file.tar.gz` for a portable archive instead; `--include-saves` bundles save data. |
+| `wm.py netplay {host,join,status}` | See Netplay below. |
+| `wm.py controllers {list,pick,telemetry,profiles}` | See Controllers below. |
+| `wm.py saves {list,backup,list-backups,restore,remove,prune}` | See Saves below. |
 
-Global flags (before the subcommand): `-v/--verbose` for DEBUG output
-(includes subprocess commands), `-q/--quiet` for warnings and errors only.
-The file log at `logs/wm.log` always captures DEBUG regardless, with
-rotation at 1 MB × 5 backups.
+Global flags (put them *before* the subcommand): `-v` for debug output,
+`-q` for warnings only. The file log always runs at DEBUG regardless.
 
-## Configuration (`.env`)
+## Configuration (.env)
 
 ```ini
-UID=1000                   # match your host user so saves keep the right owner
+UID=1000                     # match your host user so saves get the right owner
 GID=1000
-INPUT_GID=104              # gid of /dev/input/event* on your host
+INPUT_GID=104                # gid of /dev/input/event* on your host
 IMAGE_NAME=water-moccasin/dolphin
 IMAGE_TAG=latest
 CONTAINER_NAME=water-moccasin
 MEM_LIMIT=2g
-DOLPHIN_MODE=play          # play | netplay-host | shell
-CONTROLLER_DEVICES=        # e.g. /dev/input/event22,/dev/input/js0
+DOLPHIN_MODE=play            # play | netplay-host | shell
+CONTROLLER_DEVICES=          # e.g. /dev/input/event22,/dev/input/js0
 NETPLAY_PORT=2626
-NETPLAY_GAME=              # absolute container path, e.g. /game/melee.iso
+NETPLAY_GAME=                # absolute container path, e.g. /game/melee.iso
 ```
 
-Find your `INPUT_GID` with `getent group input | cut -d: -f3`.
+Find your input gid with `getent group input | cut -d: -f3`.
 
-## How saves persist
+## Saves
 
-Inside the container, Dolphin writes to `~/.config/dolphin-emu/{StateSaves,
-GC, Wii, Cache, ...}`. The entrypoint symlinks each of those subdirectories
-to `/saves/<name>` (which is bind-mounted from `./saves/` on the host). Wipe
-the container as often as you want; saves live on the host.
+Inside the container, Dolphin writes to
+`~/.config/dolphin-emu/{StateSaves, GC, Wii, Cache, ...}`. The entrypoint
+symlinks each of those to the matching subdir under `/saves`, which is
+bind-mounted from `./saves/` on the host. Net result: the container is
+disposable; your saves are not.
 
-### Backup / restore
+Backup and restore:
 
 ```sh
 python wm.py saves backup --name before-risky-glitch
@@ -122,103 +105,114 @@ python wm.py saves restore before-risky-glitch
 python wm.py saves prune --keep 5
 ```
 
-Backups are plain `tar.gz` under `dist/saves/`. `saves restore` refuses to
-overwrite a non-empty `./saves` unless you pass `--force` (in which case it
-merges — wipe first with `cleanup --wipe-saves` for a clean restore).
+Backups are plain `.tar.gz` files under `dist/saves/`. `restore` won't
+overwrite a non-empty `./saves` unless you pass `--force` (in which case
+it merges). For a clean restore, run `cleanup --wipe-saves` first.
 
-`cleanup --wipe-saves` is the only command that deletes live save data, and
-it preserves `.gitkeep`. `cleanup --archive` is a shortcut for `saves
-backup` with a timestamp name.
-
-## Logging
-
-- **`logs/wm.log`** — host CLI activity. DEBUG-level (every subprocess
-  call, every decision). Rotates at 1 MB × 5 backups.
-- **`logs/container.log`** — entrypoint messages from inside the container.
-  Rotates at 1 MB × 3 backups.
-- **Console** — INFO by default; `-v` for DEBUG, `-q` for warnings only.
-
-Both log files are plain text with ISO-8601 timestamps.
+`cleanup --archive` is the same thing as `saves backup` with an
+auto-timestamp name. `cleanup --wipe-saves` is the only command that
+touches live save data, and it still preserves `.gitkeep`.
 
 ## Controllers
 
-Dolphin speaks to controllers through `/dev/input/event*` and, for joystick
-APIs, `/dev/input/js*`. Forward your device(s) explicitly:
+Dolphin reads controllers via `/dev/input/event*`, and via
+`/dev/input/js*` for the joystick API. Docker needs each one forwarded
+explicitly. The easy path:
 
 ```sh
-python wm.py controllers list
-python wm.py controllers pick          # interactive, writes to .env
-python wm.py start                     # next start includes the chosen device
+python wm.py controllers list     # shows what the kernel sees
+python wm.py controllers pick     # interactive; writes CONTROLLER_DEVICES into .env
+python wm.py start                # next start includes it
 ```
 
-Drop exported Dolphin controller profiles (`.ini`) into
-`controller_configs/` — the entrypoint copies them into the container's
-`~/.config/dolphin-emu/Config/` on every run.
+If you've got exported Dolphin profiles, drop the `.ini` files into
+`controller_configs/` and the entrypoint copies them into the container on
+every run.
 
-## USB deployment
+`controllers telemetry` streams live `evtest` output so you can see which
+event code maps to which button before you commit to a profile.
+
+## Netplay
+
+Dolphin's netplay hosting lives in the UI; there's no CLI flag that starts
+hosting for you. `wm.py netplay host` launches the UI in netplay-host
+mode, prints your reachable IPs, and drops breadcrumbs (port, intended
+game) into the log so you don't have to retype anything. From there:
+
+1. Tools → NetPlay → Host…
+2. Pick the game and port (default 2626), click Host.
+3. Send a peer one of the IPs from the log.
+
+The peer runs `wm.py netplay join --peer YOUR_IP:2626` and uses Tools →
+NetPlay → Connect… from their Dolphin UI.
+
+`wm.py netplay status` tells you whether the container is up and whether
+anything's actually bound to the netplay port.
+
+## USB packaging
 
 ```sh
 python wm.py build
 python wm.py package-usb --dest /media/$USER/MYUSB
-# or:
+# or, for a portable archive you can copy anywhere:
 python wm.py package-usb --tarball water-moccasin.tar.gz --include-saves
 ```
 
-The bundle contains `image.tar` (exported Docker image), `wm.py`,
-`docker-compose.yml`, `.env.example`, `container/entrypoint.py`, your game
-and controller configs, and two launchers:
+You end up with `image.tar` (the exported Docker image), `wm.py`,
+`docker-compose.yml`, `.env.example`, the container entrypoint, your game
+and controller profiles, and two launchers: `run.sh` for Linux/macOS and
+`run.cmd` for Windows. The target machine still needs Docker and Python.
 
-- `run.sh` (Linux/macOS) — `docker load` on first run, then `wm.py start`.
-- `run.cmd` (Windows) — same flow via `cmd.exe`.
+## Logging
 
-The target machine still needs Docker and Python 3.10+.
+- `logs/wm.log` — host CLI activity. DEBUG-level, every subprocess call
+  included. Rotates at 1 MB × 5 backups.
+- `logs/container.log` — entrypoint messages from inside the container.
+  Rotates at 1 MB × 3 backups.
 
-## Netplay
+Both are plain text with ISO-8601 timestamps. Console verbosity follows
+`-v` / `-q`; the file log ignores those and always captures everything.
 
-Dolphin's netplay hosting action lives in the UI. `wm.py netplay host` just
-launches the UI pre-configured with breadcrumbs (port + intended game) and
-prints the host's reachable IP addresses. Once the UI is up:
+## Compose (optional)
 
-1. Tools → NetPlay → Host…
-2. Pick the game, set the port to `NETPLAY_PORT` (default 2626), click Host.
-3. Share an IP from the log with your peer.
-
-Peers run `python wm.py netplay join --peer YOUR_IP:2626` and use Tools →
-NetPlay → Connect… in their Dolphin UI.
-
-## Docker compose (optional)
-
-If you prefer compose:
+If you'd rather `docker compose up`:
 
 ```sh
 docker compose build
 docker compose up
 ```
 
-Compose doesn't know about `CONTROLLER_DEVICES` — for controllers, either
-use `wm.py start` or write a `docker-compose.override.yml` with extra
-`devices:` entries. `wm.py` is the recommended path.
+Compose doesn't know about `CONTROLLER_DEVICES` from `.env`, so if you
+need controllers you'll want a `docker-compose.override.yml` with the
+right `devices:` entries. `wm.py start` does that for you dynamically,
+which is why it's the recommended path.
 
 ## Troubleshooting
 
-- **`DISPLAY is unset`** — export DISPLAY (e.g. `:0`) before running; under
-  WSL2, WSLg sets this automatically.
-- **Black screen / no GPU** — verify `/dev/dri/renderD128` exists on the
-  host. Inside WSL2, this requires a recent Windows 11 build.
-- **Silent audio** — check `/run/user/<uid>/pulse/native` exists; on WSL2
-  you may need `pulseaudio` (WSLg provides it).
-- **Container runs as wrong user** — rebuild after changing `UID`/`GID`;
-  those are baked into the image at build time.
-- **Controller not detected** — confirm the right device with
-  `python wm.py controllers list`, then `pick`, then `start` again.
+- **Nothing on screen.** `DISPLAY` unset, or `/tmp/.X11-unix` not getting
+  mounted. Under WSL2 those come from WSLg — make sure you're on a recent
+  Windows 11 build.
+- **Black screen, no acceleration.** `/dev/dri/renderD128` is missing. On
+  native Linux, confirm your host user's in the `video` group. Under WSL2
+  this needs a recent Windows 11 build.
+- **Silent.** No PulseAudio socket at `/run/user/<uid>/pulse/native`. On
+  Linux, make sure PulseAudio (or pipewire-pulse) is running in your
+  session. WSLg provides it automatically.
+- **Container runs as the wrong user.** UID/GID are baked in at build
+  time. Rebuild after editing `.env`.
+- **Controller doesn't show up in Dolphin.** `controllers list` should
+  show it first; if not, it's a host issue. If it shows up there but not
+  in Dolphin, `controllers pick` and start again — you probably forgot
+  `CONTROLLER_DEVICES`.
 
 ## Legal
 
-This repo does not distribute ROMs. Bring your own, legally acquired. The
-Docker image contains only open-source components (Arch Linux, Dolphin,
-Python, runtime libraries).
+No ROMs in this repo and none in the image. Bring your own, legally
+acquired. The image contains only open-source software (Arch Linux,
+Dolphin, Python, runtime libraries).
 
-## References
+## Reference
 
-- Dolphin forum thread that prompted this packaging approach:
-  [How to make Dolphin work within Docker](https://forums.dolphin-emu.org/Thread-how-to-make-dolphin-works-within-docker)
+Original inspiration and the shape of the `docker run` invocation came
+from a Dolphin forums thread:
+[how to make Dolphin work within Docker](https://forums.dolphin-emu.org/Thread-how-to-make-dolphin-works-within-docker).
