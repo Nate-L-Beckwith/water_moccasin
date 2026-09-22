@@ -1,0 +1,30 @@
+# Overlay for stream mode (Sunshine inside the container, Moonlight clients):
+#   docker compose -f docker-compose.yml -f docker-compose.stream.yml up
+# Headless by default (Xvfb + PulseAudio inside the container), so the X11 and
+# PulseAudio host mounts from the base file are unused but harmless.
+# Requires the host to have the uinput (and ideally uhid) modules loaded and
+# /dev/uinput writable by INPUT_GID; see `python wm.py stream setup-host`.
+services:
+  dolphin:
+    environment:
+      DOLPHIN_MODE: stream
+      STREAM_DISPLAY: "${STREAM_DISPLAY:-xvfb}"
+      STREAM_RESOLUTION: "${STREAM_RESOLUTION:-1920x1080}"
+      STREAM_ENCODER: "${STREAM_ENCODER:-software}"
+      STREAM_AUTOSTART: "${STREAM_AUTOSTART:-0}"
+      SUNSHINE_NAME: "${SUNSHINE_NAME:-water-moccasin}"
+      SUNSHINE_USER: "${SUNSHINE_USER:-player}"
+      SUNSHINE_PASS: "${SUNSHINE_PASS:-}"
+      SUNSHINE_PORT: "${SUNSHINE_PORT:-47989}"
+    volumes:
+      - ./sunshine:/sunshine
+      # Bind (not device) so the event nodes Sunshine creates per session appear.
+      - /dev/input:/dev/input
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/uinput:/dev/uinput
+      - /dev/uhid:/dev/uhid
+    device_cgroup_rules:
+      - "c 13:* rmw"
+    stdin_open: false
+    tty: false

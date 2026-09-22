@@ -1,7 +1,7 @@
 .env
 docker-compose.override.yml
 
-# User content — never commit
+# User content - never commit
 game/*
 !game/.gitkeep
 saves/*
@@ -10,16 +10,23 @@ logs/*
 !logs/.gitkeep
 controller_configs/*
 !controller_configs/.gitkeep
+# Sunshine state: pairing certs + web UI credentials
+sunshine/*
+!sunshine/.gitkeep
 
 # USB build artifacts
 dist/
 *.tar
 *.tar.gz
 
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # Editor / OS
 .vscode/*
 !.vscode/settings.json
 .DS_Store
 Thumbs.db
-.claude
-__pycache__
+.claude/
